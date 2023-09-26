@@ -1,79 +1,83 @@
-import { Request, Response } from 'express';
-import SimpleTournamentService from '../services/simpleTournament.service';
+import { Request, Response } from "express";
+import SimpleTournamentService from "../services/simpleTournament.service";
 
 class SimpleTournamentController {
   static async createTournament(req: Request, res: Response) {
     try {
-      const { champion } = req.body;
-      const tournament = await SimpleTournamentService.createTournament(champion);
+      const { name, group } = req.body;
+      const tournament = await SimpleTournamentService.createTournament(
+        name,
+        group
+      );
       res.status(201).json(tournament);
-    } catch (error:any) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
   static async updateFinalWinner(req: Request, res: Response) {
     try {
-      const { tournamentId } = req.params;
-      const { winner } = req.body;
-      const tournament = await SimpleTournamentService.updateFinalWinner(tournamentId, winner);
+      const { winner, name } = req.body;
+      const tournament = await SimpleTournamentService.updateFinalWinner(
+        name,
+        winner
+      );
       if (!tournament) {
-        res.status(404).json({ error: 'Torneio não encontrado' });
+        res.status(404).json({ error: "Torneio não encontrado" });
       } else {
         res.json(tournament);
       }
-    } catch (error:any) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
   static async deleteTournament(req: Request, res: Response) {
     try {
-      const { tournamentId } = req.params;
-      await SimpleTournamentService.deleteTournament(tournamentId);
+      const { name } = req.body;
+      await SimpleTournamentService.deleteTournament(name);
       res.status(204).send();
-    } catch (error:any) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
   static async addTennisGameToPhase(req: Request, res: Response) {
     try {
-      const { tournamentId, side, phaseIndex } = req.params;
-      const tennisGame = req.body;
+      const { name, side, phaseName, tennisGame } = req.body;
       const tournament = await SimpleTournamentService.addTennisGameToPhase(
-        tournamentId,
-        side as 'ladoA' | 'ladoB',
-        Number(phaseIndex),
+        name,
+        side as "ladoA" | "ladoB",
+        phaseName as "oitavas" | "quartas" | "semis",
         tennisGame
       );
       if (!tournament) {
-        res.status(404).json({ error: 'Torneio não encontrado' });
+        res.status(404).json({ error: "Torneio não encontrado" });
       } else {
         res.json(tournament);
       }
-    } catch (error:any) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
   static async updateTennisGameInPhase(req: Request, res: Response) {
     try {
-      const { tournamentId, side, phaseIndex, gameIndex } = req.params;
-      const updatedGameData = req.body;
+      const { tournamentName, side, phaseName, gameIndex, updatedGameData } =
+        req.body;
       const tournament = await SimpleTournamentService.updateTennisGameInPhase(
-        tournamentId,
-        side as 'ladoA' | 'ladoB',
-        Number(phaseIndex),
+        tournamentName,
+        side as "ladoA" | "ladoB",
+        phaseName as "oitavas" | "quartas" | "semis",
         Number(gameIndex),
         updatedGameData
       );
       if (!tournament) {
-        res.status(404).json({ error: 'Torneio não encontrado' });
+        res.status(404).json({ error: "Torneio não encontrado" });
       } else {
         res.json(tournament);
       }
-    } catch (error:any) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }

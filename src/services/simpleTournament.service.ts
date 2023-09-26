@@ -1,59 +1,112 @@
-
-import { Model } from 'mongoose';
-import TennisGame, { ITennisGame } from '../models/match.model';
-import { IGameResult, ISimpleTournament, SimpleTournament } from '../models/simpleTournament.model';
+import TennisGame, { ITennisGame } from "../models/match.model";
+import {
+  IGameResult,
+  ISimpleTournament,
+  SimpleTournament,
+} from "../models/simpleTournament.model";
+import { tennisGame } from "../models/tennisGame.model";
+import PlayerService from "./player.service";
 
 class SimpleTournamentService {
-  static async createTournament(champion: string): Promise<ISimpleTournament>{
+  static async createTournament(
+    name: string,
+    group: string
+  ): Promise<ISimpleTournament> {
     try {
+      const alredyExists = await SimpleTournament.findOne({ name: name });
+      if (alredyExists) {
+        throw new Error("Torneio já existe");
+      }
+
       const tournament = new SimpleTournament({
-        champion,
+        name: name,
+        group: group,
+        ladoA: [{ oitavas: [], quartas: [], semis: [] }],
+        ladoB: [{ oitavas: [], quartas: [], semis: [] }],
       });
       await tournament.save();
+
       return tournament;
     } catch (error) {
-      throw new Error(`Erro ao criar novo torneio: ${(error as Error).message}`);
-    }
-  }
-
-  static async updateFinalWinner(tournamentId: string, winner: string): Promise<ISimpleTournament | null> {
-    try {
-      const tournament = await SimpleTournament.findByIdAndUpdate(
-        tournamentId,
-        { 'final.winner': winner },
-        { new: true }
+      throw new Error(
+        `Erro ao criar novo torneio: ${(error as Error).message}`
       );
-      return tournament;
-    } catch (error) {
-      throw new Error(`Erro ao atualizar vencedor da partida final: ${(error as Error).message}`);
     }
   }
 
-  static async deleteTournament(tournamentId: string): Promise<void> {
+  static async updateFinalWinner(
+    name: string,
+    winner: string
+  ): Promise<ISimpleTournament | null> {
     try {
-      await SimpleTournament.findByIdAndRemove(tournamentId);
+      let tournament = await SimpleTournament.findOne({ name: name });
+
+      if (!tournament) {
+        throw new Error("Torneio não encontrado");
+      }
+
+      tournament.set({ winner: winner });
+      return tournament;
+    } catch (error) {
+      throw new Error(
+        `Erro ao atualizar vencedor da partida final: ${
+          (error as Error).message
+        }`
+      );
+    }
+  }
+
+  static async deleteTournament(tournamentName: string) {
+    try {
+      await SimpleTournament.deleteOne({ name: tournamentName });
     } catch (error) {
       throw new Error(`Erro ao deletar torneio: ${(error as Error).message}`);
     }
   }
-  
+
   static async addTennisGameToPhase(
-    tournamentId: string,
-    side: 'ladoA' | 'ladoB',
-    phaseIndex: number,
-    tennisGame: ITennisGame
+    tournamentName: string,
+    side: "ladoA" | "ladoB",
+    phaseName: "oitavas" | "quartas" | "semis",
+    tennisGame: tennisGame
   ): Promise<ISimpleTournament | null> {
     try {
-      const TournamentModel: Model<ISimpleTournament> = SimpleTournament;
-
-      const tournament = await TournamentModel.findById(tournamentId);
+      const tournament = await SimpleTournament.findOne({
+        name: tournamentName,
+      });
 
       if (!tournament) {
-        throw new Error('Torneio não encontrado');
+        throw new Error("Torneio não encontrado");
       }
 
-      if ((side === 'ladoA' || side === 'ladoB') && phaseIndex >= 0 && phaseIndex < tournament[side].length) {
-        const newGame = new TennisGame(tennisGame);
+      if (side === "ladoA" || side === "ladoB") {
+        const player1 = await PlayerService.getPlayerByNameAndGroup(
+          tennisGame.player1,
+          tournament.group
+        );
+        const player2 = await PlayerService.getPlayerByNameAndGroup(
+          tennisGame.player2,
+          tournament.group
+        );
+
+        if (!player1 || !player2) {
+          throw new Error("Jogador não encontrado");
+        }
+
+        const newGame: ITennisGame = new TennisGame({
+          player1: player1._id,
+          player2: player2._id,
+          sets: tennisGame.sets,
+          winner: tennisGame.winner,
+        });
+
+        if (newGame.winner == player1.name) {
+          player1.rankPoints += 10;
+        }
+        if (newGame.winner == player2.name) {
+          player2.rankPoints += 10;
+        }
+
         await newGame.save();
 
         const gameResult: IGameResult = {
@@ -61,59 +114,72 @@ class SimpleTournamentService {
           winner: tennisGame.winner,
         };
 
-        tournament[side][phaseIndex].games.push(gameResult);
+        const phase = tournament[side].find((phase) => phase[phaseName]);
+        if (!phase) {
+          throw new Error(`Fase '${phaseName}' não encontrada`);
+        }
+
+        phase[phaseName].push(gameResult);
         await tournament.save();
         return tournament;
       } else {
-        throw new Error('Fase ou lado do torneio inválido');
+        throw new Error("Fase ou lado do torneio inválido");
       }
     } catch (error) {
-      throw new Error(`Erro ao adicionar jogo de tênis à fase do torneio: ${(error as Error).message}`);
+      throw new Error(
+        `Erro ao adicionar jogo de tênis à fase do torneio: ${
+          (error as Error).message
+        }`
+      );
     }
   }
 
   static async updateTennisGameInPhase(
-    tournamentId: string,
-    side: 'ladoA' | 'ladoB',
-    phaseIndex: number,
+    tournamentName: string,
+    side: "ladoA" | "ladoB",
+    phaseName: "oitavas" | "quartas" | "semis",
     gameIndex: number,
     updatedGameData: Partial<ITennisGame>
   ): Promise<ISimpleTournament | null> {
     try {
-      const TournamentModel: Model<ISimpleTournament> = SimpleTournament;
-0
-      const tournament = await TournamentModel.findById(tournamentId);
+      const tournament = await SimpleTournament.findOne({
+        name: tournamentName,
+      });
 
       if (!tournament) {
-        throw new Error('Torneio não encontrado');
+        throw new Error("Torneio não encontrado");
       }
 
-      if ((side === 'ladoA' || side === 'ladoB') && phaseIndex >= 0 && phaseIndex < tournament[side].length) {
-        const phase = tournament[side][phaseIndex];
-        if (gameIndex >= 0 && gameIndex < phase.games.length) {
-          const gameResult = phase.games[gameIndex];
-          const tennisGame = await TennisGame.findByIdAndUpdate(
-            gameResult.game.toString(),
-            updatedGameData,
-            { new: true }
+      if (side === "ladoA" || side === "ladoB") {
+        const phase = tournament[side].find((phase) => phase[phaseName]);
+
+        if (!phase) {
+          throw new Error(`Fase '${phaseName}' não encontrada`);
+        }
+
+        if (gameIndex >= 0 && gameIndex < phase[phaseName].length) {
+          const gameResult = phase[phaseName][gameIndex];
+          const updatedGame = Object.assign(
+            {},
+            gameResult.game,
+            updatedGameData
           );
 
-          if (!tennisGame) {
-            throw new Error('Jogo de tênis não encontrado');
-          }
-
-          gameResult.game = tennisGame._id;
-          gameResult.winner = tennisGame.winner;
+          phase[phaseName][gameIndex].game = updatedGame;
           await tournament.save();
           return tournament;
         } else {
-          throw new Error('Índice de jogo inválido na fase do torneio');
+          throw new Error("Índice de jogo inválido na fase do torneio");
         }
       } else {
-        throw new Error('Fase ou lado do torneio inválido');
+        throw new Error("Lado do torneio inválido");
       }
     } catch (error) {
-      throw new Error(`Erro ao atualizar jogo de tênis na fase do torneio: ${(error as Error).message}`);
+      throw new Error(
+        `Erro ao atualizar jogo de tênis na fase do torneio: ${
+          (error as Error).message
+        }`
+      );
     }
   }
 }

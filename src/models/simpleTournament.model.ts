@@ -1,13 +1,15 @@
-import mongoose, { Schema, Document } from 'mongoose';
-import TennisGame from './match.model';
+import mongoose, { Schema, Document } from "mongoose";
+import { ITennisGame } from "./match.model";
 
 export interface IGameResult {
-  game: typeof TennisGame;
+  game: ITennisGame;
   winner: string;
 }
 
 interface IPhase {
-  games: IGameResult[];
+  oitavas: IGameResult[];
+  quartas: IGameResult[];
+  semis: IGameResult[];
 }
 
 export interface ISimpleTournament extends Document {
@@ -15,19 +17,22 @@ export interface ISimpleTournament extends Document {
   ladoB: IPhase[];
   final?: IGameResult;
   champion?: string;
-  name?: String;
+  name: string;
+  group: string;
 }
 
 const GameResultSchema = new Schema<IGameResult>({
   game: {
     type: Schema.Types.ObjectId,
-    ref: 'TennisGame',
+    ref: "TennisGame",
   },
   winner: String,
 });
 
 const PhaseSchema = new Schema<IPhase>({
-  games: [GameResultSchema],
+  oitavas: [GameResultSchema],
+  quartas: [GameResultSchema],
+  semis: [GameResultSchema],
 });
 
 const SimpleTournamentSchema = new Schema<ISimpleTournament>({
@@ -36,8 +41,12 @@ const SimpleTournamentSchema = new Schema<ISimpleTournament>({
   final: GameResultSchema,
   champion: String,
   name: String,
+  group: String,
 });
 
-const SimpleTournament = mongoose.model<ISimpleTournament>('SimpleTournament', SimpleTournamentSchema);
+const SimpleTournament = mongoose.model<ISimpleTournament>(
+  "SimpleTournament",
+  SimpleTournamentSchema
+);
 
 export { SimpleTournament };
